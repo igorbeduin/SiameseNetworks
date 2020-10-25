@@ -52,6 +52,7 @@ class ArchModel:
         Model architecture based on the one provided in:
         http://www.cs.utoronto.ca/~gkoch/files/msc-thesis.pdf
         """
+        print(" ====== BUILDING CNN MODEL ======")
         layer_no = 0
         # Define a input layer (tensor) on the shape of the two input images
         left_input = Input(shape=self.input_shape)
@@ -146,9 +147,11 @@ class ArchModel:
         # Connect the inputs and the outputs
         siamese_net = Model(inputs=[left_input, right_input],
                             outputs=prediction)
+        print("Done!")
         return siamese_net
 
     def __compile(self):
+        "Compiling model..."
         optimizer = Adam(lr=0.00006)
         try:
             self.model.compile(loss="binary_crossentropy",

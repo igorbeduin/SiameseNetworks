@@ -1,4 +1,6 @@
 import numpy as np
+import random
+from time import time
 try:
     from trainer import Trainer
 except ImportError:
@@ -9,46 +11,75 @@ class BatchTrainer(Trainer):
     def __init__(self, model=None):
         super().__init__(model)
 
-    def __apply_transformations(self):
-        # TODO: reshape image to right dimensions
-        pass
+    def __apply_transformations(self, image):
+        h, w = image.shape
+        image = image.reshape(h, w, 1)
+        return image
 
-    def get_batch(self):
-        # TODO: randomly construct de list of pairs for batch training
-        sub1_0 = np.array([self.dataset['subject01'][0]])
-        _, w, h = sub1_0.shape
-        sub1_0 = sub1_0.reshape(w, h, 1)
+    def get_batch(self, batch_size=32, dataset=None, transform=True):
+        if dataset is None:
+            _dataset = self.dataset
+        else:
+            _dataset = dataset
+        targets = np.zeros((batch_size, ))
+        targets[:batch_size//2] = 1
+        random.shuffle(targets)
+        input_1, input_2 = [], []
+        for target in targets:
+            if target == 1:
+                key = random.choice(list(_dataset.keys()))
+                while len(_dataset[key]) == 1:
+                    key = random.choice(list(_dataset.keys()))
+                image_1 = random.choice(_dataset[key])
+                image_2 = random.choice(_dataset[key])
+                while (image_2 == image_1).all():
+                    image_2 = random.choice(_dataset[key])
+            else:
+                key_1 = random.choice(list(_dataset.keys()))
+                key_2 = random.choice(list(_dataset.keys()))
+                while (key_2 == key_1):
+                    key_2 = random.choice(list(_dataset.keys()))
+                image_1 = random.choice(_dataset[key_1])
+                image_2 = random.choice(_dataset[key_2])
 
-        sub1_1 = np.array([self.dataset['subject01'][1]])
-        _, w, h = sub1_1.shape
-        sub1_1 = sub1_1.reshape(w, h, 1)
-        self.__apply_transformations()
-        # print(sub1_0.shape, sub1_1.shape)
+            if transform is True:
+                image_1 = self.__apply_transformations(image_1)
+                image_2 = self.__apply_transformations(image_2)
+            input_1.append(image_1)
+            input_2.append(image_2)
 
-        sub2_0 = np.array([self.dataset['subject02'][0]])
-        _, w, h = sub2_0.shape
-        sub2_0 = sub2_0.reshape(w, h, 1)
-
-        sub2_1 = np.array([self.dataset['subject02'][1]])
-        _, w, h = sub2_1.shape
-        sub2_1 = sub2_1.reshape(w, h, 1)
-        # print(sub2_0.shape, sub2_1.shape)
-        
-        pairs = [np.array([sub1_0, sub1_1]), np.array([sub2_0, sub2_1])]
-        targets = np.array([0, 0])
+        pairs = [np.array(input_1), np.array(input_2)]
         return (pairs, targets)
 
     def train_on_batch(self):
         (pairs, targets) = self.get_batch()
-        oss = self.model.train_on_batch(pairs, targets)
-        print(oss)
+        loss = self.model.train_on_batch(pairs, targets)
+        print(f"Current loss: {loss}")
+        self.loss = round(loss, 2)
 
-    def loop_train(self, dataset):
-        self.epochs = 1
+    def loop_train(self, dataset, loops=None, checkpoint=None):
+        if checkpoint is not None:
+            self.checkpoint = checkpoint
+        if loops is not None:
+            self.epochs = loops
+        print(" ====== STARTING TRAINING ======")
+        start_time = time()
         self.dataset = dataset
         while self.training_enabled:
             self.count()
-            print(f"Training... ({self.cur_loop})")
+            print(f"Current loop: ({self.cur_loop}/{self.epochs})")
             self.train_on_batch()
             if self.cur_loop == self.epochs:
                 self.disable_training()
+            cur_time = round((time() - start_time)/60, 2)
+            print(f"Time since training started: {cur_time} mins")
+            if self.save_weights:
+                self.save(self.add_path, tag=self.loss)
+            print("------------------------------------------------")
+
+    @property
+    def save_weights(self):
+        if self.cur_loop % self.checkpoint == 0:
+            return True
+        else:
+            return False

@@ -1,10 +1,11 @@
 class Settings:
     def __init__(self):
-        self.__input_shape = (105, 105, 1)
+        self.__width = 150
+        self.__height = 150
 
     @property
     def input_shape(self):
-        return self.__input_shape
+        return (self.__height, self.__width, 1)
 
 
 if __name__ == "__main__":
